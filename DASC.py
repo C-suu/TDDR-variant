@@ -101,13 +101,17 @@ class DASC(object):
         self.q_weight = q_weight
 
     def select_action(self, state):
-        """Select an action using the two actors and their critic estimates."""
+        """Select the actor action with the largest value across both critics."""
         state = torch.FloatTensor(state.reshape(1, -1)).to(self.device)
         action1 = self.actor1(state)
         action2 = self.actor2(state)
-        q1 = self.critic1(state, action1)
-        q2 = self.critic2(state, action2)
-        action = action1 if q1 >= q2 else action2
+        q1_a1 = self.critic1(state, action1)
+        q2_a1 = self.critic2(state, action1)
+        q1_a2 = self.critic1(state, action2)
+        q2_a2 = self.critic2(state, action2)
+        score1 = torch.maximum(q1_a1, q2_a1)
+        score2 = torch.maximum(q1_a2, q2_a2)
+        action = action1 if score1 >= score2 else action2
         return action.cpu().data.numpy().flatten()
 
     def train(self, replay_buffer, batch_size=128):

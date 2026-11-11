@@ -178,7 +178,7 @@ class SASC_R(object):
         )
 
     def select_action(self, state, use_exploration=True):
-        """Select an action and optionally add exploration noise."""
+        """Select by the largest of four critic values, then optionally add noise."""
         with torch.no_grad():
             state = torch.FloatTensor(state.reshape(1, -1)).to(self.device)
             zs = self.fixed_encoder.zs(state)
@@ -187,9 +187,13 @@ class SASC_R(object):
             action2 = self.actor2(enhanced_state)
             zsa1 = self.fixed_encoder.zsa(zs, action1)
             zsa2 = self.fixed_encoder.zsa(zs, action2)
-            q1 = self.critic1(enhanced_state, action1, zsa1)
-            q2 = self.critic2(enhanced_state, action2, zsa2)
-            action = action1 if q1 >= q2 else action2
+            q1_a1 = self.critic1(enhanced_state, action1, zsa1)
+            q2_a1 = self.critic2(enhanced_state, action1, zsa1)
+            q1_a2 = self.critic1(enhanced_state, action2, zsa2)
+            q2_a2 = self.critic2(enhanced_state, action2, zsa2)
+            score1 = torch.maximum(q1_a1, q2_a1)
+            score2 = torch.maximum(q1_a2, q2_a2)
+            action = action1 if score1 >= score2 else action2
             if use_exploration:
                 action = action + torch.randn_like(action) * self.exploration_noise
             return action.clamp(-1, 1).cpu().data.numpy().flatten() * self.max_action
